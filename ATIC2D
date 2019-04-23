@@ -1,0 +1,133 @@
+#include <EEPROM.h>
+#define SAMPLE_TIME 2000
+int address = 0;
+int Distance = 0;
+int EnablePin =11;
+int stepPin =9;
+int Ms1=10;
+float cartesianA[3] = {0}; // X,Y,Z
+float cartesianB[3] = {0};
+float sphericalA[3] = {0}; // R,X,Y
+float sphericalB[3] = {0};
+int l,x,y;
+char measureBuf[6]; // enough space for five digits plus a zero byte
+int offset;
+float temp;
+int angle;
+float constantAngle = 0.45;
+int powerbutton;
+
+void setup()
+{
+  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(EnablePin, OUTPUT);     
+  pinMode(stepPin, OUTPUT);
+  pinMode(Ms1, OUTPUT);
+  digitalWrite(8, LOW); //dir
+  digitalWrite(9, LOW); 
+  digitalWrite(10, HIGH); //ms1
+    Serial.begin(9600);
+  while (!Serial);
+ // Serial.println("s");
+  
+}
+
+void loop()
+{
+
+  /*if(Serial.available()>0){
+    powerbutton=Serial.read();
+    }*/
+  
+  //while(1){
+  //initiate saving part for the parameter
+     // digitalWrite(LED_BUILTIN,HIGH);
+      //y = 0;
+    Serial.println("Start Horizontal Scanning");
+    Serial.print("g");
+     delay(3000);
+     angle = 200;
+      float cartesian[angle][3] = {0}; 
+      float spherical[angle][3] = {0};
+       
+      for (y = 0; y <= angle; y++) {
+       // spherical[y][1] = 90 * (1 / 57.296);
+        spherical[y][1] = (y) * (1 / 63.673989);  // 0.9deg to rad
+      }
+    y=angle;
+      Serial.println(y);
+      
+      while (y >= 0) {
+      //Serial.println("enter y >=0 loop");
+        if ((Serial.available() > 0)) {
+          char ch = Serial.read();
+          //Serial.println("read");
+          if (ch == '\r') {
+            measureBuf[offset] = '\0';
+            if ((measureBuf[0] > 47) && (measureBuf[0] < 58) && (measureBuf[1] > 47) && (measureBuf[1] < 58) && (measureBuf[2] > 47) && (measureBuf[2] < 58) && (measureBuf[3] > 47) && (measureBuf[3] < 58) && (measureBuf[4] > 47) && (measureBuf[4] < 58)) {
+              Serial.println(measureBuf);
+              for (x = 0; x <1; x++) {
+                digitalWrite(stepPin, HIGH);
+                delayMicroseconds(1200);
+                digitalWrite(stepPin, LOW);
+                delayMicroseconds(1200);
+              }
+              delay(300);
+              temp = atof (measureBuf);//แปลง
+              Serial.println(temp * 0.001, 8);
+              spherical[y][0] = (temp * 0.0010)-(0.05);
+               Serial.println(spherical[y][0]);
+              y--;
+            } 
+           }
+          else if (ch == '\n') {
+            offset = 0; 
+          }
+          else if (offset < 5)
+            measureBuf[offset++] = ch;
+               }    
+            }
+                Serial.println("Finish loop 1");
+               digitalWrite(EnablePin, HIGH);
+               //Serial.println(EnablePin);
+               Serial.println("Enable");
+      delay(100);
+      Serial.println("----------------------RESULT--------------------");
+      Serial.println("");
+      //--------------------calculate-------------------
+     
+      for (y = 0; y < angle; y++) {
+        cartesian[y][0] = (spherical[y][0]) * (cos(spherical[y][1])); //x=rcostheta
+        cartesian[y][1] = (spherical[y][0]) * (sin(spherical[y][1])); //y=rsintheta
+        //cartesian[y][2] = (spherical[y][0]) * (cos(spherical[y][1])); //z=rcostheta
+      }
+      for (y = 0; y < angle; y++) {
+        Serial.println(cartesian[y][0],5);
+         EEPROM.put(address,cartesian[y][0]);
+        
+        address++;
+      }
+      Serial.println(" ");
+      for (y = 0; y < angle; y++) {
+        Serial.println(cartesian[y][1],5);
+        EEPROM.put(address,cartesian[y][1]);
+        
+        address++;
+      }
+      /*Serial.println(" check");
+      for (y = 0; y < angle; y++) {
+        //Serial.println(cartesian[y][2],5);
+        Serial.println("0.00");
+      }*/
+      Serial.println(" ");
+      Serial.print("address:");
+      Serial.println(address);
+      //--------------------calculate-------------------
+      digitalWrite(EnablePin, HIGH);
+      Serial.print("s");
+      delay(100);
+
+     // break;
+  //}  
+ 
+  }
