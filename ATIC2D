@@ -1,5 +1,11 @@
 #include <EEPROM.h>
 #define SAMPLE_TIME 2000
+//encoder 0
+#define encoder0PinA 2
+#define encoder0PinB 3
+volatile int encoder0Count = 0;
+volatile float angle0 = 0;
+//EEPROM
 int address = 0;
 int Distance = 0;
 int EnablePin =11;
@@ -17,6 +23,47 @@ int angle;
 float constantAngle = 0.45;
 int powerbutton;
 
+//Encoder 0
+void doEncoder0A(){  // interrupt 0 function
+  if (digitalRead(encoder0PinA) == HIGH) {  // look for a low-to-high on channel A
+    if (digitalRead(encoder0PinB) == LOW) { // check channel B to see which way encoder is turning
+      encoder0Count = encoder0Count + 1;
+    } 
+    else {
+      encoder0Count = encoder0Count - 1;
+    }
+  }
+  else {                                     // must be a high-to-low edge on channel A
+    if (digitalRead(encoder0PinB) == HIGH) { // check channel B to see which way encoder is turning  
+      encoder0Count = encoder0Count + 1;
+    } 
+    else {
+      encoder0Count = encoder0Count - 1;
+    }
+  }
+  angle0 = 0.00523598775*encoder0Count;  // unit: radian
+}
+
+void doEncoder0B(){  // interrupt 1 function
+  if (digitalRead(encoder0PinB) == HIGH) {   // look for a low-to-high on channel B
+    if (digitalRead(encoder0PinA) == HIGH) { // check channel A to see which way encoder is turning
+      encoder0Count = encoder0Count + 1;
+    } 
+    else {
+      encoder0Count = encoder0Count - 1;
+    }
+  }
+  else {                                    // must be a high-to-low edge on on channel B
+    if (digitalRead(encoder0PinA) == LOW) { // check channel B to see which way encoder is turning
+      encoder0Count = encoder0Count + 1;
+    } 
+    else {
+      encoder0Count = encoder0Count - 1;
+    }
+  }
+  angle0 = 0.00523598775*encoder0Count;  // unit: radian 0.3deg to rad
+}
+
 void setup()
 {
   pinMode(LED_BUILTIN, OUTPUT);
@@ -29,7 +76,10 @@ void setup()
     Serial.begin(9600);
   while (!Serial);
  // Serial.println("s");
-  
+  pinMode(encoder0PinA, INPUT); 
+  pinMode(encoder0PinB, INPUT); 
+  attachInterrupt(0, doEncoder0A, CHANGE);  
+  attachInterrupt(1, doEncoder0B, CHANGE);
 }
 
 void loop()
@@ -51,8 +101,9 @@ void loop()
       float spherical[angle][3] = {0};
        
       for (y = 0; y <= angle; y++) {
-       // spherical[y][1] = 90 * (1 / 57.296);
-        spherical[y][1] = (y) * (1 / 63.673989);  // 0.9deg to rad
+        //spherical[y][1] = (y) * (1 / 63.673989);  // 0.9 theta
+        //spherical[y][2] = 90 * (1 / 57.296); //phe
+         spherical[y][1] = (y) *(0.9 * (1000 / 57296));
       }
     y=angle;
       Serial.println(y);
@@ -76,7 +127,10 @@ void loop()
               temp = atof (measureBuf);//แปลง
               Serial.println(temp * 0.001, 8);
               spherical[y][0] = (temp * 0.0010)-(0.05);
-               Serial.println(spherical[y][0]);
+              Serial.println(spherical[y][0],8);
+              Serial.print("cnt0: ");
+              Serial.print(encoder0Count, DEC); 
+              Serial.print("; ");
               y--;
             } 
            }
@@ -97,19 +151,22 @@ void loop()
       //--------------------calculate-------------------
      
       for (y = 0; y < angle; y++) {
-        cartesian[y][0] = (spherical[y][0]) * (cos(spherical[y][1])); //x=rcostheta
-        cartesian[y][1] = (spherical[y][0]) * (sin(spherical[y][1])); //y=rsintheta
-        //cartesian[y][2] = (spherical[y][0]) * (cos(spherical[y][1])); //z=rcostheta
+      /*  cartesian[y][0] = (spherical[y][0]) * (sin(spherical[y][1])) * (cos(spherical[y][2])); //x=rsintheta cos phe
+        cartesian[y][1] = (spherical[y][0]) * (sin(spherical[y][1])) * (sin(spherical[y][2])); //y=rsintheta sin phe
+        cartesian[y][2] = (spherical[y][0]) * (cos(spherical[y][1])); //z=rcostheta*/
+        cartesian[y][0] = (spherical[y][0]) * (cos(spherical[y][1])); //x=rsintheta cos phe
+        cartesian[y][1] = (spherical[y][0]) * (sin(spherical[y][1])); //y=rsintheta sin phe
+        
       }
       for (y = 0; y < angle; y++) {
-        Serial.println(cartesian[y][0],5);
+        Serial.println(cartesian[y][0],8);
          EEPROM.put(address,cartesian[y][0]);
         
         address++;
       }
       Serial.println(" ");
       for (y = 0; y < angle; y++) {
-        Serial.println(cartesian[y][1],5);
+        Serial.println(cartesian[y][1],8);
         EEPROM.put(address,cartesian[y][1]);
         
         address++;
